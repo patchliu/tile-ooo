@@ -1,0 +1,68 @@
+%% tile-ooo 架构图（中文）。
+%% 重新生成 SVG：
+%%   mmdc -i doc/architecture-detailed.zh.mmd -o doc/architecture-detailed.zh.svg
+flowchart TB
+    subgraph FE["前端"]
+        direction LR
+        FETCH["取指"] --> DECODE["译码"] --> ISSUE["分类 / 发射<br/>≤1 标量 + ≤1 命令"]
+    end
+
+    subgraph SC["标量乱序路径"]
+        direction TB
+        RENAME["重命名 / 分配<br/>PRF · ROB 项"]
+        IQ["标量发射队列"]
+        EXEC["ALU · 分支 · 标量 LSU"]
+        PRF["PRF 写回"]
+        ROB["ROB · 按序提交"]
+        RENAME --> IQ --> EXEC --> PRF --> ROB
+    end
+
+    subgraph TC["Tensor 命令路径"]
+        direction TB
+        CQ["命令队列 + Scoreboard<br/>资源 & tile 依赖"]
+        CUBE["Cube<br/>4×4 INT8 · INT32 累加"]
+        VEC["Vector<br/>加 · 乘 · ReLU · GELU"]
+        TLSU["Tile LSU<br/>TLOAD / TSTORE"]
+        CQ --> CUBE
+        CQ --> VEC
+        CQ --> TLSU
+    end
+
+    subgraph STORE["存储"]
+        SPAD["共享 Scratchpad<br/>4 × 64 B bank"]
+        RAT["Tile 重命名<br/>tile RAT · free list"]
+    end
+
+    MEM["外部存储器<br/>共享仲裁器：标量 LSU + Tile LSU"]
+    EV["事件状态<br/>SET / WAIT · 作用域 · 代际"]
+
+    ISSUE -- 标量 --> RENAME
+    ISSUE -- 命令 --> CQ
+
+    CUBE <--> SPAD
+    VEC <--> SPAD
+    TLSU <--> SPAD
+
+    RAT -. 映射 .-> SPAD
+
+    TLSU <--> MEM
+    EXEC <--> MEM
+
+    CUBE -. 完成 .-> EV
+    VEC -. 完成 .-> EV
+    TLSU -. 完成 .-> EV
+    EV -. 等待 .-> IQ
+
+    classDef fe fill:#fff6cc,stroke:#c9a227,stroke-width:1.5px;
+    classDef scalar fill:#e8efff,stroke:#6184d8,stroke-width:1.5px;
+    classDef tensor fill:#ffedd6,stroke:#d9953c,stroke-width:1.5px;
+    classDef store fill:#e5f4f6,stroke:#2c9bb0,stroke-width:1.5px;
+    classDef mem fill:#f1f5f9,stroke:#94a3b8,stroke-width:1.5px;
+    classDef event fill:#f2ebff,stroke:#9a69c7,stroke-width:1.5px;
+
+    class FETCH,DECODE,ISSUE fe;
+    class RENAME,IQ,EXEC,PRF,ROB scalar;
+    class CQ,CUBE,VEC,TLSU tensor;
+    class SPAD,RAT store;
+    class MEM mem;
+    class EV event;
