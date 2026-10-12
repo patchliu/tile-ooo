@@ -1,0 +1,3 @@
+// programs/hello/hello.hex — 阶段 1：单条 HALT
+// 注意：待 tools/assembler 完成后，此文件将由 hello.s 自动生成。
+0000007f
